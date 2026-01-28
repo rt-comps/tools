@@ -1,0 +1,4 @@
+#!/bin/zsh
+# Wrapper for stage.js
+
+node "${0}.js" $*

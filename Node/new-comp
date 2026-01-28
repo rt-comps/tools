@@ -1,0 +1,22 @@
+#!/bin/zsh
+# Wrapper for new-module.js
+set -euo pipefail
+
+# Prompt for component name if none provided else use each provided argument
+[[ $# -eq 0 ]] && read "names?Provide component name: " || names=($@)
+
+# If no name is provided (even after prompting) then exit
+if [[ -z "${names}" ]]; then
+    printf "No name specified ...exiting\n"
+    exit
+fi
+
+# Run Node job for each (Node script checks for duplicates)
+for name in "${names[@]}"; do
+    printf "Creating component RT-${name:u}...\n"
+    set +e
+    node "${0%/*}/new-component.js" "rt-${name}"
+    [[ $? -eq 0 ]] && result="succeeded" || result="failed"
+    set -e
+    printf "Create RT-%s : %s\n" ${name:u} ${result} 
+done

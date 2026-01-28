@@ -1,0 +1,8 @@
+#!/bin/zsh
+# Wrapper for deploy.js
+
+if [[ $# -eq 0 ]]; then
+    node "${0}.js"
+else
+    node "${0}.js" $*
+fi
