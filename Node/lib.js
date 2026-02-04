@@ -5,13 +5,15 @@ import {
 } from 'fs/promises';
 
 // Check for files/dirs in destination that no longer exist in source
-//  returns a promise that file deletions will complete
+//  returns: A promise that resolves when file deletions have completed
 async function delDownstream(srcPath, dstPath) {
 
-    // Get list of folder contents for source and destination
+    const flags = new Map([['updated', false]])
+    // Get list of folder contents for source and destination (array of Dirent objects)
     const srcList = await fs_readdir(srcPath, { withFileTypes: true, recursive: true });
-    const dstList = await fs_readdir(dstPath, { withFileTypes: true, recursive: true });
-    // Get list of dirs in source
+    let dstList = await fs_readdir(dstPath, { withFileTypes: true, recursive: true });
+
+    // Identify dirs in source
     const srcDirs = srcList
         // Get directories as relative path
         .filter(el => el.isDirectory())
@@ -34,25 +36,26 @@ async function delDownstream(srcPath, dstPath) {
     // Remove directories from destination that do not exist in source
     const waitForDirDelete = deleteDirs.map(async el => {
         console.log(`Deleting directory "${dstPath}${el}"`);
+        if (!flags.get('updated')) flags.set('updated', true);
         return fs_rm(`${dstPath}${el}`, { recursive: true, force: true })
     })
     // Let all dir deletions complete
     await Promise.all(waitForDirDelete);
 
     // Now get list of files
-    // Destination may have changed so need to re-read destination dir
-    const dstList2 = await fs_readdir(dstPath, { withFileTypes: true, recursive: true });
-    const dstFiles = dstList2
-        .filter(el => el.isFile())
-        .map(el => `${el.parentPath}/${el.name}`
-            .split(dstPath)
-            .pop()
-        );
     // Source should be unchanged so can just process re-process for files
     const srcFiles = srcList
         .filter(el => el.isFile())
         .map(el => `${el.parentPath}/${el.name}`
             .split(srcPath)
+            .pop()
+        );
+    // Directories may have been removed from Destination, if so then need to re-read destination dir
+    if (flags.get('updated')) dstList = await fs_readdir(dstPath, { withFileTypes: true, recursive: true });
+    const dstFiles = dstList
+        .filter(el => el.isFile())
+        .map(el => `${el.parentPath}/${el.name}`
+            .split(dstPath)
             .pop()
         );
     // Find files that only exist in destination
@@ -66,6 +69,7 @@ async function delDownstream(srcPath, dstPath) {
     return Promise.all(waitForFileDelete);
 }
 
+// Wraps console.log to identify which file created the log (prepends)
 function customLog() {
     // Throw a new error at point function is called
     const err = new Error();
@@ -73,7 +77,7 @@ function customLog() {
     const stack = err.stack.split('\n')[2];
     // Manipulate string to create array of form [ <filename>, <line number>, <column number> ]
     const matchResult = stack.split('/').pop().split(':')
-    // Output this line and concatenate all arguments
+    // Concatenate all arguments passed to function as the "message"
     console.log(`[${matchResult[0]}:${matchResult[1]}] - ${[...arguments].join(' : ')}`);
 }
 

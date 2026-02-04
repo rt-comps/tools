@@ -5,8 +5,8 @@
 // 
 // Code is taken from the specified component (Default: all components & modules) and moved to docs dir of staging repo
 // The "staging type" defines how files are presented on staging
-// 1    -   Copy files "as is" to staging (default if not specified)
-// 2    -   Copy minified versions to staging
+// 1    -   Copy files "as is" to staging
+// 2    -   Copy minified versions to staging (default if not specified)
 // 3    -   Copy full files with production substitutions
 // 4    -   Full, minified, production version
 // 8    -   Used when calling from deploy.js
@@ -74,7 +74,7 @@ const defaultParams = [
 ]
 //  Flags
 // Default to stage type 1
-let stgType = 1;
+let stgType = 2;
 
 // ### Local Functions
 
@@ -103,7 +103,7 @@ function constSub(contents) {
             const line = toSub[0];
             subs = new Map(Object.entries(JSON.parse(line.slice(line.indexOf('{')))))
         }
-        
+
         // Perform substitutions
         subs.forEach((value, key) => {
             // Search for parameter assignment to change (use RegExp to allow use of variable)
@@ -124,16 +124,17 @@ function constSub(contents) {
 try {
     // ### Derive some more constants
     const execPath = process.argv[1];
-    const workingDir = execPath.slice(0, execPath.indexOf(prodRepo));
-    
+    const workingDir = execPath.slice(0, execPath.indexOf('/tools'));
+
     // Set source and destination paths
     //  Assume component directories are at same level as 'Node' directory (where this script is placed)
-    const srcPath = execPath.slice(0, execPath.indexOf('/Node'));
+    const srcPath = `${workingDir}/${prodRepo}/dev/simon`;
     //  Files are output to 'docs' directory of staging repo
-    const dstPath = `${workingDir}${stageRepo}/docs`;
-    // Clean up Stage by deleting ant files/folders that no longer exist in Dev
+    const dstPath = `${workingDir}/${stageRepo}/docs`;
+
+    // Clean up Stage by deleting any files/folders that no longer exist in Dev
     await myLib.delDownstream(srcPath, dstPath);
-    
+
     // ### Process any parameters provided
     let paramList = process.argv.slice(2);
     //  Check if "staging type" has been provided (first param) - default to type 1
@@ -157,8 +158,8 @@ try {
     const miniHOpt = stgType % 2 === 0 ? miniHOpt1 : miniHOpt2;
     //  Convert parameter list to component path list 
     const compList = paramList.map(comp => {
-        // Don't alter component path if it is in default defaultParams
-        if (defaultParams.indexOf(comp) > -1) return comp
+        // Don't alter component path if it is found in defaultParams
+        if (defaultParams.includes(comp)) return comp
         else return (`components/${comp}`)
     })
 
@@ -182,7 +183,6 @@ try {
 
     // Asynchronously process all specified components/modules and collect promises
     const waitForComps = compList.map(async comp => {
-
         // Recurse through component directory to generate an array of directory entry objects
         const rawFileList = await fs_readdir(`${srcPath}/${comp}`, { withFileTypes: true, recursive: true })
         // Filter out directory objects and convert remaining objects to relative file path strings
@@ -257,7 +257,8 @@ try {
         // ### This code assumes you are working on a POSIX-compliant system with Git installed
         // Options when spawning external commands
         const spawnOpts = {
-            cwd: `${workingDir}${stageRepo}`, // Ensure Git commands are made within staging tree
+            shell: '/bin/zsh',
+            cwd: dstPath, // Ensure Git commands are made within staging tree
             encoding: 'utf8'
         }
         // Stage any changes made to the staging repo
@@ -275,8 +276,8 @@ try {
     }
 
 } catch (e) {
-    console.log(e)
+    // Write error to stdout
     console.log((e.cause && e.cause === 'custom') ? e.message : e);
     // Allow a calling process to determine that script terminated abnormally
-    process.exit(1);
+    process.exitCode = 1;
 }

@@ -2,7 +2,7 @@
 
 Some Node scripts to automate processes
 
-Each script also has a shell wrapper
+Each script also has a shell wrapper (script name minus .js)
 ## *Create a new component* - new-component.js
 
 Creates a new component with the name(s) provided, using the standard template files.
